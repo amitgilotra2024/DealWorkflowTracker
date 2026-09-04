@@ -127,10 +127,4 @@ The project implements a layered resilience pipeline inside `DealEventProducer`:
 
 ---
 
-## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
-
-```
-
-```
