@@ -27,6 +27,14 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
+	implementation 'org.springframework.kafka:spring-kafka'
+
+	// Resilience4j for Spring Boot 3
+	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+
+	// Required for Spring AOP aspect processing (@CircuitBreaker and @Retry annotations)
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+
 	// Database
 	runtimeOnly 'org.postgresql:postgresql'
 

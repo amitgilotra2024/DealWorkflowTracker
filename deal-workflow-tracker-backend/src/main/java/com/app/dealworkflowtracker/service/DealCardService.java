@@ -1,10 +1,12 @@
 package com.app.dealworkflowtracker.service;
 
 import com.app.dealworkflowtracker.dto.DealCardCreateRequest;
+import com.app.dealworkflowtracker.dto.DealEventDto;
 import com.app.dealworkflowtracker.entities.BankEntity;
 import com.app.dealworkflowtracker.entities.DealCard;
 import com.app.dealworkflowtracker.entities.Facility;
 import com.app.dealworkflowtracker.entities.User;
+import com.app.dealworkflowtracker.messaging.DealEventProducer;
 import com.app.dealworkflowtracker.repository.DealCardRepository;
 import com.app.dealworkflowtracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -21,6 +24,7 @@ public class DealCardService {
 
     private final DealCardRepository dealCardRepository;
     private final UserRepository userRepository; // Injected instance, not static
+    private final DealEventProducer dealEventProducer; // Injected Kafka Producer
 
     @Transactional(readOnly = true)
     public List<DealCard> findAll() {
@@ -68,7 +72,20 @@ public class DealCardService {
         bankEntity.setDealCard(dealCard);
         dealCard.setBankEntity(bankEntity);
 
-        return dealCardRepository.save(dealCard);
+        DealCard savedDeal = dealCardRepository.save(dealCard);
+
+        // Publish Asynchronous Kafka Event after successful DB persist
+        DealEventDto event = new DealEventDto(
+                savedDeal.getId(),
+                savedDeal.getDealName(),
+                savedDeal.getStatus(),
+                "DEAL_CREATED",
+                username,
+                LocalDateTime.now()
+        );
+        dealEventProducer.publishDealEvent(event);
+
+        return savedDeal;
     }
 
     @Transactional
