@@ -126,5 +126,103 @@ The project implements a layered resilience pipeline inside `DealEventProducer`:
 | **DELETE** | `/api/deal-cards/{id}` | `ADMIN` | Delete a deal card by its ID. |
 
 ---
+Below is the comprehensive **System Architecture Design** for your **Deal Workflow Tracker** application. It captures your entire technical stack (Spring Boot 3, Spring Security JWT, PostgreSQL, Kafka, and Resilience4j) into a production-grade blueprint.
 
+---
+
+### High-Level Architecture Diagram
+
+```
+                              [ Client / Frontend ]
+                                        │
+                                        │ (HTTP REST / Bearer Token)
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           SPRING BOOT 3 BACKEND SYSTEM                          │
+│                                                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                         Presentation Layer                              │   │
+│   │  - AuthController (/api/auth)                                           │   │
+│   │  - UserController (/api/users)                                          │   │
+│   │  - DealCardController (/api/deal-cards)                                 │   │
+│   └────────────────────────────────────┬────────────────────────────────────┘   │
+│                                        │                                        │
+│                                        ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                           Security Layer                                │   │
+│   │  - JwtAuthenticationFilter (Extracts Bearer token, sets SecurityContext)│   │
+│   │  - SecurityConfig (@PreAuthorize Role Guards: ADMIN, ANALYST, VIEWER)    │   │
+│   └────────────────────────────────────┬────────────────────────────────────┘   │
+│                                        │                                        │
+│                                        ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                         Business Service Layer                          │   │
+│   │  - DealCardService / UserService                                        │   │
+│   └───────────────────┬─────────────────────────────────┬───────────────────┘   │
+│                       │                                 │                       │
+│                       ▼                                 ▼                       │
+│   ┌───────────────────────────────┐   ┌─────────────────────────────────────┐   │
+│   │       Persistence Layer       │   │        Event Pipeline Layer         │   │
+│   │  - UserRepository             │   │  - DealEventProducer                │   │
+│   │  - DealCardRepository         │   │    [@CircuitBreaker]                │   │
+│   │  - PostgreSQL Driver          │   │    [@Retry + Backoff + Jitter]      │   │
+│   └───────────────┬───────────────┘   └──────────────────┬──────────────────┘   │
+└───────────────────┼──────────────────────────────────────┼──────────────────────┘
+                    │                                      │
+                    ▼                                      ▼
+           ┌─────────────────┐                    ┌─────────────────┐
+           │ PostgreSQL DB   │                    │ Apache Kafka    │
+           │ (port 5432)     │                    │ Broker Container│
+           │                 │                    │ (port 9092)     │
+           └─────────────────┘                    └────────┬────────┘
+                                                           │
+                                                           ▼
+                                                  ┌─────────────────┐
+                                                  │ DealEventConsumer│
+                                                  │ (DLQ Recoverer) │
+                                                  └─────────────────┘
+
+```
+
+---
+
+### Layer-by-Layer Architectural Decomposition
+
+#### 1. Security & Authentication Infrastructure
+
+* **Stateless JWT Security:** Requests flow through the `JwtAuthenticationFilter`. Valid tokens populate the `SecurityContextHolder` with granted authorities (`ROLE_ADMIN`, `ROLE_ANALYST`, `ROLE_VIEWER`).
+* **Service-Level Authorization:** Method-level guards (`@PreAuthorize`) protect fine-grained business logic rather than relying purely on URL patterns, preventing unauthorized access across application components.
+
+#### 2. Data Persistence Strategy (PostgreSQL)
+
+* **Transactional Management:** Data mutations in `DealCardService` run inside `@Transactional` boundaries.
+* **Hibernate ORM:** Translates entity mapping, generating structured SQL queries to `springdb` on PostgreSQL (port `5432`).
+
+#### 3. Fault-Tolerant Event Messaging (Kafka + Resilience4j)
+
+Your system utilizes a dual-layer fault-tolerance model to guarantee message delivery without blocking web threads or crashing during broker downtimes.
+
+* **Producer-Side Resilience (`DealEventProducer`):**
+* **Synchronous Transport Guarantee:** Employs `.get()` on the `CompletableFuture` returned by `KafkaTemplate`. This exposes broker transport exceptions directly to the execution context.
+* **Resilience4j Retries with Jitter:** On connection failure, Resilience4j executes up to 3 retries using exponential backoff ($1\text{s} \rightarrow 2\text{s} \rightarrow 4\text{s}$) enriched with randomized jitter variance to prevent thundering herd spikes.
+* **Circuit Breaker:** Tracks a sliding window of 10 requests. If failure rate exceeds 50%, the circuit transitions to `OPEN` for 10 seconds, immediately short-circuiting network calls directly into `publishDealEventFallback(...)`.
+
+
+* **Consumer-Side Resilience (`KafkaRetryConfig`):**
+* Configured via `DefaultErrorHandler` using standard Spring `ExponentialBackOff`.
+* Unprocessable or "poison pill" messages are intercepted and automatically redirected to a Dead Letter Topic (`.DLT`) via `DeadLetterPublishingRecoverer`.
+
+
+
+---
+
+### Data & Execution Flow Sequence
+
+1. **Client Request:** A client sends a `POST /api/deal-cards/createDealCard` request containing a Bearer JWT token in the `Authorization` header.
+2. **Filter & Authentication:** `JwtAuthenticationFilter` validates the signature, extracts claims, and authorizes the user.
+3. **Database Operation:** `DealCardService` persists the new entity to the PostgreSQL database.
+4. **Event Trigger:** `DealEventProducer.publishDealEvent()` is invoked to notify downstream systems asynchronously.
+5. **Resilience Check:**
+* **Normal State (`CLOSED`):** Message publishes to the `deal-events` topic successfully.
+* **Broker Down State (`OPEN`):** Circuit Breaker redirects execution immediately to `publishDealEventFallback(...)`, logging the failure or routing the event to an offline store without failing the client HTTP request.
 
