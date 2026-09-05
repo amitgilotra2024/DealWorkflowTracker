@@ -6,34 +6,48 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "audit_logs")
+@Table(name = "audit_logs", schema = "public")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class AuditLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String entityName;             // e.g. "DealCard", "Facility", "Entity"
+    private String action;
+
+    @Column(name = "entity_name")
+    private String entityName;
+
+    @Column(name = "entity_id")
     private Long entityId;
 
-    private String action;                 // CREATE, UPDATE, DELETE, STATUS_CHANGE
+    @Column(name = "old_value", columnDefinition = "TEXT")
+    private String oldValue;
 
-    @Column(columnDefinition = "TEXT")
-    private String oldValue;               // JSON or plain text
+    @Column(name = "new_value", columnDefinition = "TEXT")
+    private String newValue;
 
-    @Column(columnDefinition = "TEXT")
-    private String newValue;               // JSON or plain text
+    @Column(name = "changed_by")
+    private Long changedBy;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "changed_by")
-    private User changedBy;
+    @Column(name = "changed_on", nullable = false)
+    private LocalDateTime changedOn;
 
-    private LocalDateTime changedOn = LocalDateTime.now();
-
+    @Column(name = "ip_address")
     private String ipAddress;
+
+    @Column(name = "user_agent")
     private String userAgent;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.changedOn == null) {
+            this.changedOn = LocalDateTime.now();
+        }
+    }
 }

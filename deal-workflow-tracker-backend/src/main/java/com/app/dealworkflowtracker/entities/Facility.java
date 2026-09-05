@@ -1,6 +1,6 @@
 package com.app.dealworkflowtracker.entities;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,10 +22,9 @@ public class Facility extends BaseLog {
     private String facilityType;
     private Double limitAmount;
 
-    // Point to entity_id to match existing PostgreSQL table column
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entity_id", nullable = false)
-    @JsonBackReference // Prevents Jackson from serializing back to BankEntity endlessly
+    @JsonIgnoreProperties("facilities") // Prevents circular back-reference to BankEntity
     private BankEntity bankEntity;
 
     @Override

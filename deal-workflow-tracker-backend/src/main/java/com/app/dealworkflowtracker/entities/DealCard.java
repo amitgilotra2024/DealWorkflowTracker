@@ -1,5 +1,6 @@
 package com.app.dealworkflowtracker.entities;
 
+import com.app.dealworkflowtracker.domain.DealState;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -23,17 +24,53 @@ public class DealCard extends BaseLog {
 
     private String dealName;
     private String dealType;
-    private String status;
+    private String status; // Persists the state string (e.g., "UNDERWRITING")
     private String borrowerName;
     private Double amount;
 
-    @OneToOne(mappedBy = "dealCard", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    // Domain tracking fields for state details
+    private String lastUpdatedBy;
+    private String statusNotes;
+
+    // Shifted ownership: mappedBy points to the dealCard field in BankEntity
+    @OneToOne(mappedBy = "dealCard", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     @JsonIgnoreProperties("dealCard")
     private BankEntity bankEntity;
 
     @OneToMany(mappedBy = "dealCard", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Workflow> workflows = new ArrayList<>();
+
+    // --- State Engine Conversion Helper Methods ---
+
+    /**
+     * Converts persistent entity fields into a Java 21 Sealed State Record.
+     */
+    public DealState toDomainState() {
+        return DealState.fromString(this.status, this.lastUpdatedBy, this.statusNotes);
+    }
+
+    /**
+     * Updates entity fields based on the new Java 21 Sealed State Record.
+     */
+    public void applyDomainState(DealState newState) {
+        this.status = newState.name();
+        switch (newState) {
+            case DealState.UnderwritingState u -> this.lastUpdatedBy = u.assignedAnalyst();
+            case DealState.ComplianceCheckState c -> this.lastUpdatedBy = c.analyst();
+            case DealState.ApprovedState a -> {
+                this.lastUpdatedBy = a.approvedBy();
+                this.statusNotes = a.approvalNotes();
+            }
+            case DealState.RejectedState r -> {
+                this.lastUpdatedBy = r.rejectedBy();
+                this.statusNotes = r.reason();
+            }
+            case DealState.DraftState d -> {}
+        }
+    }
+
+    // --- Bi-directional Helper Methods ---
 
     public void setBankEntity(BankEntity bankEntity) {
         this.bankEntity = bankEntity;

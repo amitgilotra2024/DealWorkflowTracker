@@ -1,10 +1,13 @@
 package com.app.dealworkflowtracker.controller;
 
 import com.app.dealworkflowtracker.dto.DealCardCreateRequest;
+import com.app.dealworkflowtracker.dto.DealCardResponse;
 import com.app.dealworkflowtracker.entities.DealCard;
-import com.app.dealworkflowtracker.service.DealCardService;
+import com.app.dealworkflowtracker.service.Impl.DealCardServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -16,24 +19,33 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DealCardController {
 
-    private final DealCardService dealCardService;
-
-    @GetMapping("/getAll")
-    @PreAuthorize("hasAnyRole('VIEWER', 'ANALYST', 'ADMIN')")
-    public List<DealCard> getAll() {
-        return dealCardService.findAll();
-    }
+    private final DealCardServiceImpl dealCardServiceImpl;
 
     @PostMapping("/createDealCard")
     @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
-    public DealCard createDealCard(@Valid @RequestBody DealCardCreateRequest request, Authentication authentication) {
-        String currentUsername = authentication.getName();
-        return dealCardService.createDealCard(request, currentUsername);
+    public ResponseEntity<DealCardResponse> createDealCard(@Valid @RequestBody DealCardCreateRequest request,
+                                                           Authentication auth) {
+        String username = extractUsername(auth);
+        DealCard savedCard = dealCardServiceImpl.createDealCard(request, username);
+        return ResponseEntity.status(HttpStatus.CREATED).body(DealCardResponse.fromEntity(savedCard));
     }
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public void delete(@PathVariable Long id) {
-        dealCardService.delete(id);
+    @GetMapping("/{id}")
+    public ResponseEntity<DealCardResponse> getDealCardById(@PathVariable Long id) {
+        DealCard dealCard = dealCardServiceImpl.getDealCardById(id);
+        return ResponseEntity.ok(DealCardResponse.fromEntity(dealCard));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<DealCardResponse>> getAllDealCards() {
+        List<DealCardResponse> cards = dealCardServiceImpl.getAllDealCards()
+                .stream()
+                .map(DealCardResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(cards);
+    }
+
+    private String extractUsername(Authentication auth) {
+        return (auth != null && auth.isAuthenticated()) ? auth.getName() : "admin_user";
     }
 }
