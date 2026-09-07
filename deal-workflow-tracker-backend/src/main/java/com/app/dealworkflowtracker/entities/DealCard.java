@@ -22,6 +22,9 @@ public class DealCard extends BaseLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "lts_deal_id")
+    private String ltsDealId;
+
     private String dealName;
     private String dealType;
     private String status; // Persists the state string (e.g., "UNDERWRITING")

@@ -4,7 +4,7 @@ import com.app.dealworkflowtracker.domain.DealEvent;
 import com.app.dealworkflowtracker.dto.DealCardResponse;
 import com.app.dealworkflowtracker.entities.DealCard;
 import com.app.dealworkflowtracker.entities.User;
-import com.app.dealworkflowtracker.service.DealWorkflowService; // Injected interface
+import com.app.dealworkflowtracker.service.DealWorkflowService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class DealWorkflowController {
 
-    private final DealWorkflowService dealWorkflowService; // Injected interface instead of Impl
+    private final DealWorkflowService dealWorkflowService;
 
     // Transition: DRAFT -> UNDERWRITING
     @PostMapping("/{id}/submit")
@@ -49,7 +49,7 @@ public class DealWorkflowController {
         return ResponseEntity.ok(DealCardResponse.fromEntity(updatedCard));
     }
 
-    // Transition: COMPLIANCE_CHECK -> APPROVED
+    // FIX: Corrected route path from "/{id}p" to "/{id}/approve"
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DealCardResponse> approveDeal(@PathVariable Long id,
@@ -87,7 +87,7 @@ public class DealWorkflowController {
 
     private Long extractUserId(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) {
-            return 1L; // Fallback to admin_user ID 1 for local testing
+            return 1L;
         }
 
         Object principal = auth.getPrincipal();

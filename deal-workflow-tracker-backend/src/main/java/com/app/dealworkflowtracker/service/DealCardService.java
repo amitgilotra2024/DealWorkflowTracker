@@ -8,4 +8,7 @@ public interface DealCardService {
     DealCard createDealCard(DealCardCreateRequest request, String username);
     DealCard getDealCardById(Long id);
     List<DealCard> getAllDealCards();
+
+    // New method for explicit user invocation
+    DealCard invokeLtsDealCreation(Long dealCardId);
 }

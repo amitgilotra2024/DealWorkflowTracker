@@ -3,7 +3,7 @@ package com.app.dealworkflowtracker.controller;
 import com.app.dealworkflowtracker.dto.DealCardCreateRequest;
 import com.app.dealworkflowtracker.dto.DealCardResponse;
 import com.app.dealworkflowtracker.entities.DealCard;
-import com.app.dealworkflowtracker.service.Impl.DealCardServiceImpl;
+import com.app.dealworkflowtracker.service.DealCardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,30 +19,38 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DealCardController {
 
-    private final DealCardServiceImpl dealCardServiceImpl;
+    // Inject the interface instead of the concrete implementation class
+    private final DealCardService dealCardService;
 
     @PostMapping("/createDealCard")
     @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
     public ResponseEntity<DealCardResponse> createDealCard(@Valid @RequestBody DealCardCreateRequest request,
                                                            Authentication auth) {
         String username = extractUsername(auth);
-        DealCard savedCard = dealCardServiceImpl.createDealCard(request, username);
+        DealCard savedCard = dealCardService.createDealCard(request, username);
         return ResponseEntity.status(HttpStatus.CREATED).body(DealCardResponse.fromEntity(savedCard));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<DealCardResponse> getDealCardById(@PathVariable Long id) {
-        DealCard dealCard = dealCardServiceImpl.getDealCardById(id);
+        DealCard dealCard = dealCardService.getDealCardById(id);
         return ResponseEntity.ok(DealCardResponse.fromEntity(dealCard));
     }
 
     @GetMapping
     public ResponseEntity<List<DealCardResponse>> getAllDealCards() {
-        List<DealCardResponse> cards = dealCardServiceImpl.getAllDealCards()
+        List<DealCardResponse> cards = dealCardService.getAllDealCards()
                 .stream()
                 .map(DealCardResponse::fromEntity)
                 .toList();
         return ResponseEntity.ok(cards);
+    }
+
+    @PostMapping("/{id}/invoke-lts")
+    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    public ResponseEntity<DealCardResponse> invokeLts(@PathVariable Long id) {
+        DealCard updatedCard = dealCardService.invokeLtsDealCreation(id);
+        return ResponseEntity.ok(DealCardResponse.fromEntity(updatedCard));
     }
 
     private String extractUsername(Authentication auth) {

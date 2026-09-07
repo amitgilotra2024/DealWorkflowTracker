@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class DealCardResponse {
 
     private Long id;
+    private String ltsDealId;
     private String dealName;
     private String dealType;
     private String status;
@@ -31,16 +32,29 @@ public class DealCardResponse {
 
         return DealCardResponse.builder()
                 .id(entity.getId())
+                .ltsDealId(entity.getLtsDealId())
                 .dealName(entity.getDealName())
                 .dealType(entity.getDealType())
                 .status(entity.getStatus())
                 .borrowerName(entity.getBorrowerName())
                 .amount(entity.getAmount())
                 .bankEntity(BankEntityResponse.fromEntity(entity.getBankEntity()))
-                .createdBy(entity.getCreatedBy() != null ? entity.getCreatedBy().getUsername() : null)
+                .createdBy(extractUsername(entity.getCreatedBy()))
                 .createdOn(entity.getCreatedOn())
-                .updatedBy(entity.getUpdatedBy() != null ? entity.getUpdatedBy().getUsername() : null)
+                .updatedBy(extractUsername(entity.getUpdatedBy()))
                 .updatedOn(entity.getUpdatedOn())
                 .build();
+    }
+
+    /**
+     * Safely extracts the username whether BaseLog stores a User object or String.
+     */
+    private static String extractUsername(Object userField) {
+        return switch (userField) {
+            case null -> null;
+            case String username -> username;
+            case com.app.dealworkflowtracker.entities.User user -> user.getUsername();
+            default -> userField.toString();
+        };
     }
 }
