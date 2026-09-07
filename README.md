@@ -74,7 +74,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/springdb
     username: springuser
-    password: springuser
+    password: *********
 
 ```
 
