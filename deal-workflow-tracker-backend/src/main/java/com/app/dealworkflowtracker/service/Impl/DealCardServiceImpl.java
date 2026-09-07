@@ -96,11 +96,14 @@ public class DealCardServiceImpl implements DealCardService {
 
     @SneakyThrows
     private void triggerAsyncLtsCall(Long dealCardId) {
-        String requestJson = objectMapper.writeValueAsString(Map.of("dealCardId", dealCardId));
+        // 1. Build JSON payload string
+        Map<String, Object> requestMap = Map.of("dealCardId", dealCardId);
+        String requestJson = objectMapper.writeValueAsString(requestMap);
 
+        // 2. Save initial audit log with requestPayload set
         LtsAuditLog auditLog = LtsAuditLog.builder()
                 .dealCardId(dealCardId)
-                .requestPayload(requestJson)
+                .requestPayload(requestJson) // Store request payload
                 .sentAt(LocalDateTime.now())
                 .status("IN_PROGRESS")
                 .build();
@@ -112,7 +115,6 @@ public class DealCardServiceImpl implements DealCardService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
 
-            // Expect immediate HTTP 202 Accepted response from API Gateway / Mock LTS
             ResponseEntity<Map> response = restTemplate.postForEntity(
                     "http://localhost:8080/api/external/lts/create-deal-async",
                     entity,
@@ -121,6 +123,7 @@ public class DealCardServiceImpl implements DealCardService {
 
             if (response.getStatusCode() != HttpStatus.ACCEPTED && response.getStatusCode() != HttpStatus.OK) {
                 auditLog.setStatus("SUBMISSION_FAILED");
+                auditLog.setResponsePayload(objectMapper.writeValueAsString(response.getBody()));
                 ltsAuditLogRepository.save(auditLog);
                 throw new RuntimeException("Gateway rejected LTS submission for ID: " + dealCardId);
             }

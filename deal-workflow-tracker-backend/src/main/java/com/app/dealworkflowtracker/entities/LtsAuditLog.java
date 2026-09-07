@@ -24,12 +24,10 @@ public class LtsAuditLog {
     @Column(name = "lts_deal_id")
     private String ltsDealId;
 
-    @Lob
-    @Column(name = "request_payload")
+    @Column(name = "request_payload", columnDefinition = "TEXT")
     private String requestPayload;
 
-    @Lob
-    @Column(name = "response_payload")
+    @Column(name = "response_payload", columnDefinition = "TEXT")
     private String responsePayload;
 
     @Column(name = "sent_at", nullable = false)
